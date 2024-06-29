@@ -1,35 +1,20 @@
-# # Function Calling with OpenAI APIs
-
 import os
 import json
 from dotenv import load_dotenv
-from groq import Groq
 import requests
+import streamlit as st
 
+# Load environment variables
 load_dotenv()
+
 # Retrieve API keys from environment variables
-# GROQ_API_KEY = os.getenv('GROQ_API_KEY')
-# OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY')
+GROQ_API_KEY = os.getenv('GROQ_API_KEY')
+OPENWEATHER_API_KEY = os.getenv('OPENWEATHER_API_KEY')
 
-os.environ["GROQ_API_KEY"] = os.getenv('GROQ_API_KEY')
-os.environ["OPENWEATHER_API_KEY"] = os.getenv('OPENWEATHER_API_KEY')
-
-
-client = Groq(
-    api_key=os.getenv("GROQ_API_KEY"),
-)
-
-
-
-# ### Define Dummy Function
-
-# Defines a dummy function to get the current weather
-# ### Define Dummy Function
-
-# Defines a dummy function to get the current weather
+# Function to get current weather
 def get_current_weather(location):
     """Get the current weather in a given location"""
-
+    
     base_url = "http://api.openweathermap.org/data/2.5/weather?"
     complete_url = f"{base_url}appid={OPENWEATHER_API_KEY}&q={location}"
 
@@ -37,81 +22,43 @@ def get_current_weather(location):
 
     if response.status_code == 200:
         data = response.json()
-        weather = data['weather'][0]['main']
+        weather_description = data['weather'][0]['description']
         temperature = data['main']['temp'] - 273.15  # Convert Kelvin to Celsius
-        return json.dumps({
+        humidity = data['main']['humidity']
+        pressure = data['main']['pressure']
+        wind_speed = data['wind']['speed']
+        return {
             "city": location,
-            "weather": weather,
-            "temperature": round(temperature, 2)
-        })
-    else:
-        return json.dumps({"city": location, "weather": "Data Fetch Error", "temperature": "N/A"})
-
-
-
-# ### Define Functions
-# 
-# As demonstrated in the OpenAI documentation, here is a simple example of how to define the functions that are going to be part of the request. 
-# 
-# The descriptions are important because these are passed directly to the LLM and the LLM will use the description to determine whether to use the functions or how to use/call.
-
-
-
-
-# define a function as tools
-tools = [
-    {
-        "type": "function",
-        "function": {
-            "name": "get_current_weather",
-            "description": "Get the current weather in a given location",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "location": {
-                        "type": "string",
-                        "description": "The city and state, e.g. San Francisco, CA",
-                    },
-                },
-                "required": ["location"],
-            },
-        },   
-    }
-]
-
-
-
-response = client.chat.completions.create(
-    model="mixtral-8x7b-32768",
-    messages=[
-        {
-            "role": "user",
-            "content": "What is the weather like in Chennai?",
+            "weather_description": weather_description,
+            "temperature": round(temperature, 2),
+            "humidity": humidity,
+            "pressure": pressure,
+            "wind_speed": wind_speed
         }
-    ],
-    temperature=0,
-    max_tokens=300,
-    tools=tools,
-    tool_choice="auto"
-)
+    else:
+        return {
+            "city": location,
+            "weather_description": "Data Fetch Error",
+            "temperature": "N/A",
+            "humidity": "N/A",
+            "pressure": "N/A",
+            "wind_speed": "N/A"
+        }
 
-# print(response.choices[0].message.content)
+# Streamlit UI
+st.title("Weather App")
+st.write("Enter a city name to get the current weather information.")
 
+city = st.text_input("City Name")
 
-
-groq_response = response.choices[0].message
-print(groq_response)
-
-
-# response.tool_calls[0].function.arguments
-
-# We can now capture the arguments:
-
-
-args = json.loads(groq_response.tool_calls[0].function.arguments)
-print(args)
-
-print("output")
-print(get_current_weather(**args))
-
-# Task: Put this into another call and return the response
+if st.button("Get Weather"):
+    if city:
+        weather_info = get_current_weather(city)
+        st.write(f"**City:** {weather_info['city']}")
+        st.write(f"**Weather Description:** {weather_info['weather_description']}")
+        st.write(f"**Temperature:** {weather_info['temperature']} °C")
+        st.write(f"**Humidity:** {weather_info['humidity']} %")
+        st.write(f"**Pressure:** {weather_info['pressure']} hPa")
+        st.write(f"**Wind Speed:** {weather_info['wind_speed']} m/s")
+    else:
+        st.write("Please enter a city name.")
